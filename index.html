@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mathe-Dashboard — GeoGebra Engine</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --ink: #0f141b;
+    --ink-2: #4b5666;
+    --ink-3: #8b95a6;
+    --line: #e6e9ef;
+    --line-2: #d4dae4;
+    --accent: #2563eb;
+    --accent-2: #1d4ed8;
+    --accent-weak: #eef3ff;
+    --ok: #0f7b58;
+    --ok-weak: #e9f6f1;
+    --warn: #b45309;
+    --err: #b42318;
+    --err-weak: #fdecea;
+    --radius: 10px;
+    --sidebar-w: 344px;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button, input { font-family: inherit; font-size: inherit; }
+
+  .topbar {
+    flex: 0 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    z-index: 20;
+  }
+
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand-mark {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(140deg, #2563eb, #7c3aed);
+    color: #fff; display: grid; place-items: center;
+    font-weight: 700; font-size: 15px;
+    flex: 0 0 auto;
+  }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+  .brand-title { font-weight: 650; font-size: 14px; white-space: nowrap; }
+  .brand-sub { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+
+  .spacer { flex: 1 1 auto; }
+
+  .tabs {
+    display: flex; gap: 2px; padding: 3px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 999px;
+  }
+  .tab {
+    border: 0; background: transparent; color: var(--ink-2);
+    padding: 6px 13px; border-radius: 999px; cursor: pointer;
+    font-size: 12.5px; font-weight: 500; white-space: nowrap;
+    transition: background .14s ease, color .14s ease;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active { background: var(--ink); color: #fff; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel);
+    font-size: 11.5px; color: var(--ink-2); white-space: nowrap;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); flex: 0 0 auto; }
+  .chip.load .dot { background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+  .chip.ok .dot { background: var(--ok); }
+  .chip.warn .dot { background: var(--warn); }
+  .chip.err .dot { background: var(--err); }
+
+  .icon-btn {
+    width: 34px; height: 34px; flex: 0 0 auto;
+    display: grid; place-items: center;
+    border: 1px solid var(--line); background: var(--panel);
+    border-radius: 9px; cursor: pointer; color: var(--ink-2);
+    transition: background .14s ease, color .14s ease, border-color .14s ease;
+  }
+  .icon-btn:hover { background: var(--accent-weak); color: var(--accent); border-color: var(--accent); }
+  .icon-btn svg { width: 17px; height: 17px; }
+
+  .layout { flex: 1 1 auto; display: flex; min-height: 0; }
+
+  .sidebar {
+    flex: 0 0 var(--sidebar-w); width: var(--sidebar-w);
+    display: flex; flex-direction: column;
+    background: var(--panel); border-right: 1px solid var(--line);
+    min-height: 0; transition: flex-basis .2s ease, width .2s ease;
+  }
+  .sidebar-head {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; border-bottom: 1px solid var(--line);
+  }
+  .sidebar-head h2 {
+    margin: 0; font-size: 11px; font-weight: 650;
+    letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .sidebar-scroll { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
+
+  body.collapsed .sidebar { flex-basis: 0; width: 0; border-right: 0; overflow: hidden; }
+
+  .stage { flex: 1 1 auto; position: relative; min-width: 0; background: #fff; }
+  #ggb-element, .ggb-host { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .acc { border-bottom: 1px solid var(--line); }
+  .acc > summary {
+    list-style: none; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 14px; user-select: none;
+    font-size: 13px; font-weight: 600;
+    transition: background .14s ease;
+  }
+  .acc > summary::-webkit-details-marker { display: none; }
+  .acc > summary:hover { background: #fafbfd; }
+  .acc[open] > summary { border-bottom: 1px solid var(--line); }
+  .acc-ico {
+    width: 24px; height: 24px; flex: 0 0 auto; border-radius: 7px;
+    background: var(--accent-weak); color: var(--accent);
+    display: grid; place-items: center; font-size: 13px; font-weight: 700;
+  }
+  .acc-title { flex: 1 1 auto; }
+  .chev { width: 15px; height: 15px; color: var(--ink-3); flex: 0 0 auto; transition: transform .18s ease; }
+  .acc[open] .chev { transform: rotate(180deg); }
+  .acc-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field-label {
+    font-size: 10.5px; font-weight: 600; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  .input {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--line-2); border-radius: 8px;
+    background: #fcfdff; color: var(--ink);
+    font-family: var(--mono); font-size: 13px;
+    transition: border-color .14s ease, box-shadow .14s ease, background .14s ease;
+  }
+  .input::placeholder { color: #aab2c0; }
+  .input:focus { outline: 0; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  .input:disabled { opacity: .55; }
+
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1 1 0; min-width: 0; }
+
+  .grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-3 { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 9px 11px; border: 1px solid var(--line-2); background: var(--panel);
+    border-radius: 8px; color: var(--ink); cursor: pointer;
+    font-size: 12.5px; font-weight: 500; line-height: 1.2; text-align: center;
+    transition: background .14s ease, border-color .14s ease, color .14s ease, box-shadow .14s ease;
+  }
+  .btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-weak); }
+  .btn:disabled { opacity: .42; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+  .btn-tool { flex-direction: column; gap: 7px; padding: 13px 6px; min-height: 78px; }
+  .btn-tool span { font-size: 11px; line-height: 1.25; }
+  .btn-tool svg { width: 21px; height: 21px; }
+  .btn.active { border-color: var(--accent); background: var(--accent-weak); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .btn-ghost { background: transparent; border-style: dashed; color: var(--ink-2); }
+  .btn-sm { padding: 7px 10px; font-size: 12px; }
+
+  .out {
+    border: 1px solid var(--line); background: #fbfcfe; border-radius: var(--radius);
+    padding: 9px 11px; font-size: 12px; color: var(--ink-2); min-height: 34px;
+  }
+  .out-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3px 0; }
+  .out-row + .out-row { border-top: 1px dashed var(--line); }
+  .out-label { color: var(--ink-3); flex: 0 0 auto; }
+  .out-value { font-family: var(--mono); color: var(--ink); text-align: right; word-break: break-word; }
+  .out-empty { color: var(--ink-3); font-style: italic; }
+  .out-ok { border-color: #c3e4d7; background: var(--ok-weak); color: #0b5f45; }
+  .out-err { border-color: #f2c9c6; background: var(--err-weak); color: var(--err); }
+  .out-info { border-color: #c9d9fb; background: var(--accent-weak); color: #1e40af; }
+
+  .hint { margin: 0; font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
+  .hint code { font-family: var(--mono); background: var(--bg); padding: 1px 4px; border-radius: 4px; color: var(--ink-2); }
+
+  .slider-row { display: grid; grid-template-columns: 18px 1fr 48px; align-items: center; gap: 10px; }
+  .slider-row + .slider-row { margin-top: 6px; }
+  .slider-name { font-family: var(--mono); font-size: 13px; color: var(--ink); font-weight: 600; }
+  .slider-val { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); text-align: right; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); height: 20px; cursor: pointer; }
+  input[type="range"]:disabled { opacity: .5; cursor: not-allowed; }
+
+  .switch { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); cursor: pointer; user-select: none; }
+  .switch input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+
+  .overlay {
+    position: absolute; inset: 0; z-index: 5;
+    display: grid; place-items: center;
+    background: rgba(245,246,248,.94);
+    transition: opacity .25s ease;
+  }
+  body.is-ready .overlay { opacity: 0; pointer-events: none; }
+  .overlay-inner {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    text-align: center; padding: 20px; max-width: 400px;
+  }
+  .overlay-title { font-size: 14px; font-weight: 600; }
+  .overlay-text { font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
+  .spinner {
+    width: 28px; height: 28px; border: 2.5px solid var(--line-2);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  body.is-ready .spinner, body.is-ready .overlay-actions { display: none; }
+  body.is-failed .spinner { display: none; }
+
+  .toast-host {
+    position: fixed; right: 16px; bottom: 16px; z-index: 60;
+    display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  }
+  .toast {
+    pointer-events: auto; min-width: 220px; max-width: 340px;
+    background: var(--ink); color: #fff; padding: 10px 14px; border-radius: 9px;
+    font-size: 12.5px; line-height: 1.45;
+    animation: toast-in .2s ease;
+  }
+  .toast.err { background: var(--err); }
+  .toast.ok { background: var(--ok); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .28; } }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #d9dee6; border-radius: 999px; border: 3px solid var(--panel); }
+  ::-webkit-scrollbar-thumb:hover { background: #c2cad6; }
+
+  .drawer-backdrop { display: none; }
+
+  @media (max-width: 940px) {
+    .tabs { display: none; }
+    .brand-sub { display: none; }
+    .sidebar {
+      position: absolute; z-index: 30; top: 56px; bottom: 0; left: 0;
+      width: min(340px, 88vw); flex-basis: min(340px, 88vw);
+      box-shadow: 0 0 40px rgba(15,20,27,.18);
+    }
+    body:not(.collapsed) .drawer-backdrop {
+      display: block; position: fixed; inset: 56px 0 0 0;
+      background: rgba(15,20,27,.28); z-index: 25;
+    }
+  }
+</style>
+<script>
+(function () {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('appName') !== 'suite' && !sessionStorage.getItem('ggbSuiteBoost')) {
+      sessionStorage.setItem('ggbSuiteBoost', '1');
+      params.set('appName', 'suite');
+      params.set('showMenuBar', 'false');
+      params.set('showToolBar', 'false');
+      params.set('showAlgebraInput', 'false');
+      params.set('showInputBar', 'false');
+      params.set('showFileMenu', 'false');
+      params.set('showPerspectiveMenu', 'false');
+      params.set('useBrowserForJS', 'false');
+      params.set('language', 'de');
+      window.location.replace(window.location.pathname + '?' + params.toString());
+    }
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="topbar">
+  <button class="icon-btn" id="toggleSidebar" title="Sidebar ein-/ausklappen" aria-label="Sidebar ein-/ausklappen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+
+  <div class="brand">
+    <div class="brand-mark">&#8721;</div>
+    <div class="brand-text">
+      <span class="brand-title">Mathe-Dashboard</span>
+      <span class="brand-sub">vollst&#228;ndige GeoGebra-Engine &#183; Suite</span>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <nav class="tabs" id="viewTabs">
+    <button class="tab active" data-perspective="G">Standard 2D Grafik</button>
+    <button class="tab" data-perspective="T">3D Grafikraum</button>
+    <button class="tab" data-perspective="S">Tabellenkalkulation</button>
+    <button class="tab" data-perspective="B">Wahrscheinlichkeit</button>
+  </nav>
+
+  <div class="spacer"></div>
+
+  <div class="chip load" id="statusChip"><span class="dot"></span><span id="statusText">Engine wird geladen &#8230;</span></div>
+</header>
+
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <h2>Werkzeuge</h2>
+      <div class="spacer"></div>
+      <button class="btn btn-sm btn-ghost" id="collapseBtn" type="button">Ausblenden</button>
+    </div>
+
+    <div class="sidebar-scroll">
+
+      <details class="acc" open>
+        <summary>
+          <span class="acc-ico">&#8721;</span>
+          <span class="acc-title">CAS &amp; Algebra</span>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="acc-body">
+          <label class="field">
+            <span class="field-label">Eingabe</span>
+            <input class="input" id="casInput" type="text" spellcheck="false" autocomplete="off"
+                   placeholder="z. B.  x^3 - 3x - 2 = 0   &#183;   f(x)=x^2-4">
+          </label>
+          <div class="row">
+            <button class="btn btn-primary" id="casRun" type="button">Auswerten &amp; zeichnen</button>
+          </div>
+          <div class="grid">
+            <button class="btn" data-cas="solve" type="button">L&#246;se Gleichung</button>
+            <button class="btn" data-cas="derivative" type="button">Leite ab</button>
+            <button class="btn" data-cas="integral" type="button">Integiere</button>
+            <button class="btn" data-cas="simplify" type="button">Vereinfache Bruch</button>
+            <button class="btn" data-cas="roots" type="button">Nullstellen</button>
+            <button class="btn" data-cas="factor" type="button">Faktorisieren</button>
+          </div>
+          <div class="out" id="out-cas"><span class="out-empty">Noch keine Eingabe ausgewertet.</span></div>
+          <p class="hint">Eingaben der Form <code>f(x)=&#8230;</code> werden automatisch als Funktion gezeichnet.</p>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>
+          <span class="acc-ico">&#9651;</span>
+          <span class="acc-title">Geometrie &amp; Formen</span>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="acc-body">
+          <div class="grid-3" id="toolGrid"></div>
+          <div class="row">
+            <button class="btn" id="moveTool" type="button">Verschieben (Maus)</button>
+            <button class="btn btn-ghost" id="eraseTool" type="button">L&#246;schen</button>
+          </div>
+          <div class="out" id="out-geo"><span class="out-empty">Werkzeug w&#228;hlen, dann in der Grafik klicken.</span></div>
+          <p class="hint">Kreise und Winkel per Doppelklick auf das Objekt ver&#228;ndern. <b>Esc</b> = zur&#252;ck zum Verschieben.</p>
+        </div>
+      </details>
+
+      <details class="acc" open>
+        <summary>
+          <span class="acc-ico">&#8767;</span>
+          <span class="acc-title">Analysis &amp; Funktionen</span>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="acc-body">
+          <label class="field">
+            <span class="field-label">Funktion</span>
+            <input class="input" id="fnInput" type="text" spellcheck="false" autocomplete="off"
+                   placeholder="z. B.  a x^2 + b x + c   &#183;   sin(x)">
+          </label>
+          <div class="row">
+            <button class="btn btn-primary" id="fnPlot" type="button">Funktion plotten</button>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Parameter a &#183; b &#183; c</span>
+            <div class="slider-row">
+              <span class="slider-name">a</span>
+              <input type="range" id="sliderA" min="-6" max="6" step="0.1" value="1">
+              <span class="slider-val" id="valA">1.0</span>
+            </div>
+            <div class="slider-row">
+              <span class="slider-name">b</span>
+              <input type="range" id="sliderB" min="-6" max="6" step="0.1" value="-1">
+              <span class="slider-val" id="valB">-1.0</span>
+            </div>
+            <div class="slider-row">
+              <span class="slider-name">c</span>
+              <input type="range" id="sliderC" min="-6" max="6" step="0.1" value="0">
+              <span class="slider-val" id="valC">0.0</span>
+            </div>
+          </div>
+          <label class="switch"><input type="checkbox" id="showSliders" checked> Slider im Diagramm anzeigen</label>
+
+          <div class="grid">
+            <button class="btn" data-an="extrema" type="button">Extrempunkte anzeigen</button>
+            <button class="btn" data-an="inflection" type="button">Wendepunkte anzeigen</button>
+            <button class="btn" data-an="roots" type="button">Nullstellen anzeigen</button>
+            <button class="btn" data-an="area" type="button">Fl&#228;che Integral 0&#8230;b</button>
+          </div>
+          <div class="out" id="out-an"><span class="out-empty">Noch keine Funktion geplottet.</span></div>
+        </div>
+      </details>
+
+      <details class="acc">
+        <summary>
+          <span class="acc-ico">&#9637;</span>
+          <span class="acc-title">Stochastik &amp; Statistik</span>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="acc-body">
+          <label class="field">
+            <span class="field-label">Datenliste</span>
+            <input class="input" id="dataInput" type="text" spellcheck="false" autocomplete="off" value="1, 2, 5, 5, 8">
+          </label>
+          <div class="row">
+            <button class="btn btn-primary" id="dataCreate" type="button">Liste erzeugen</button>
+          </div>
+          <div class="grid">
+            <button class="btn" data-stat="Mean" data-caption="Mittelwert" type="button">Mittelwert</button>
+            <button class="btn" data-stat="Median" data-caption="Median" type="button">Median</button>
+            <button class="btn" data-stat="StandardDeviation" data-caption="Standardabw." type="button">Standardabweichung</button>
+            <button class="btn" data-stat="Variance" data-caption="Varianz" type="button">Varianz</button>
+            <button class="btn" data-stat="Range" data-caption="Spannweite" type="button">Spannweite</button>
+          </div>
+          <div class="grid">
+            <button class="btn" id="barChart" type="button">Balkendiagramm</button>
+            <button class="btn" id="histogram" type="button">Histogramm (5 Klassen)</button>
+          </div>
+          <div class="out" id="out-st"><span class="out-empty">Noch keine Datenliste.</span></div>
+        </div>
+      </details>
+
+      <details class="acc">
+        <summary>
+          <span class="acc-ico">&#9881;</span>
+          <span class="acc-title">Arbeitsfl&#228;che</span>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="acc-body">
+          <div class="grid">
+            <button class="btn" id="viewReset" type="button">Standardfenster</button>
+            <button class="btn" id="viewAll" type="button">Alles anzeigen</button>
+            <button class="btn" id="toggleGrid" type="button">Raster umschalten</button>
+            <button class="btn" id="clearAll" type="button">Konstruktion leeren</button>
+          </div>
+          <div class="out" id="out-view"><span class="out-empty">Fenster &#8722;10 &#8230; 10 &#183; Raster an.</span></div>
+        </div>
+      </details>
+
+      <div style="height:18px"></div>
+    </div>
+  </aside>
+
+  <section class="stage" id="stage">
+    <div id="ggb-element"></div>
+    <div class="overlay">
+      <div class="overlay-inner">
+        <div class="spinner"></div>
+        <div class="overlay-title" id="overlayTitle">GeoGebra Engine wird gestartet</div>
+        <div class="overlay-text" id="overlayText">Das offizielle Web-Bundle wird geladen (appName: suite). Alle Schaltfl&#228;chen werden aktiviert, sobald die Engine bereit ist.</div>
+        <div class="overlay-actions row" id="overlayActions" style="display:none">
+          <button class="btn" id="retryBtn" type="button">Erneut versuchen</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="toast-host" id="toastHost"></div>
+
+  <script src="https://www.geogebra.org/apps/deployggb.js"></script>
+<script>
+'use strict';
+
+var $ = function (sel, root) { return (root || document).querySelector(sel); };
+var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+
+var ggbApplet = null;
+
+var state = {
+  ready: false,
+  appName: '\u2014',
+  version: '\u2014',
+  perspective: 'G',
+  fn: null,
+  slidersMade: false,
+  slidersVisible: true,
+  grid: true,
+  colorIndex: 0,
+  chart: '',
+  palette: [
+    [37, 99, 235], [219, 39, 119], [5, 150, 105], [217, 119, 6],
+    [124, 58, 237], [220, 38, 38], [13, 148, 136], [101, 163, 13]
+  ]
+};
+
+var TOOLS = [
+  { mode: 1, icon: 'point', label: 'Punkt' },
+  { mode: 2, icon: 'line', label: 'Gerade' },
+  { mode: 15, icon: 'segment', label: 'Strecke' },
+  { mode: 7, icon: 'vector', label: 'Vektor' },
+  { mode: 10, icon: 'circle', label: 'Kreis' },
+  { mode: 16, icon: 'polygon', label: 'Vieleck' },
+  { mode: 51, icon: 'regular', label: 'Regelmäßig' },
+  { mode: 36, icon: 'angle', label: 'Winkel' },
+  { mode: 38, icon: 'distance', label: 'Länge' },
+  { mode: 19, icon: 'midpoint', label: 'Mitte' },
+  { mode: 5, icon: 'intersect', label: 'Schnitt' },
+  { mode: 4, icon: 'perp', label: 'Lot' }
+];
+
+var ICONS = {
+  point: '<circle cx="12" cy="12" r="3.4"/>',
+  line: '<path d="M3 19L21 5"/>',
+  segment: '<path d="M5 17L19 7"/><circle cx="5" cy="17" r="2.1"/><circle cx="19" cy="7" r="2.1"/>',
+  vector: '<path d="M4 18L18 6"/><path d="M12.5 6H18v5.5"/>',
+  circle: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/>',
+  polygon: '<path d="M12 3.2l8.4 6.1-3.2 9.9H6.8L3.6 9.3z"/>',
+  regular: '<path d="M12 2.6l7 5.1-2.7 8.2H7.7L5 7.7z"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
+  angle: '<path d="M4 19h16"/><path d="M4 19L17 6.5"/><path d="M10.2 19a6.4 6.4 0 0 0 1.9-4.6"/>',
+  distance: '<path d="M4 16.5L20 7.5"/><path d="M4 13v7M20 4.5v7"/>',
+  midpoint: '<circle cx="5" cy="16" r="2.1"/><circle cx="19" cy="8" r="2.1"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
+  intersect: '<path d="M3 6l18 12M3 18L21 6"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/>',
+  perp: '<path d="M3 20h18"/><path d="M8 20L20 4.5"/><path d="M8 20h4.2v-4.2"/>'
+};
+
+function svgIcon(name, size) {
+  var s = size || 16;
+  return '<svg viewBox="0 0 24 24" width="' + s + '" height="' + s + '" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + '</svg>';
+}
+
+function waitFor(test, timeoutMs, intervalMs) {
+  return new Promise(function (resolve) {
+    var started = Date.now();
+    var step = intervalMs || 160;
+    (function tick() {
+      var value = null;
+      try { value = test(); } catch (e) { value = null; }
+      if (value) { return resolve(value); }
+      if (Date.now() - started > timeoutMs) { return resolve(null); }
+      setTimeout(tick, step);
+    })();
+  });
+}
+
+function isApiReady(api) {
+  if (!api || typeof api.evalCommand !== 'function') { return false; }
+  if (typeof api.getVersion !== 'function') { return true; }
+  try { return String(api.getVersion() || '').length > 0; } catch (e) { return false; }
+}
+
+function readAppName(api) {
+  try {
+    if (api && typeof api.getAppName === 'function') { return String(api.getAppName() || '\u2014'); }
+  } catch (e) {}
+  return '\u2014';
+}
+
+function setStatus(kind, text) {
+  var chip = $('#statusChip');
+  var label = $('#statusText');
+  if (!chip || !label) { return; }
+  chip.className = 'chip ' + kind;
+  var meta = state.appName !== '\u2014' ? ' \u00b7 ' + state.appName : '';
+  if (kind === 'ok') {
+    label.textContent = 'Engine bereit' + meta + (state.version !== '\u2014' ? ' \u00b7 v' + state.version : '');
+  } else {
+    label.textContent = text + meta;
+  }
+}
+
+function toast(message, kind) {
+  var host = $('#toastHost');
+  if (!host) { return; }
+  var el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.textContent = message;
+  host.appendChild(el);
+  setTimeout(function () {
+    el.style.transition = 'opacity .25s ease, transform .25s ease';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(6px)';
+    setTimeout(function () { if (el.parentNode) { el.parentNode.removeChild(el); } }, 260);
+  }, 4200);
+}
+
+function setOverlay(title, text, failed) {
+  var t = $('#overlayTitle');
+  var x = $('#overlayText');
+  var a = $('#overlayActions');
+  if (t) { t.textContent = title; }
+  if (x) { x.textContent = text; }
+  if (a) { a.style.display = failed ? 'flex' : 'none'; }
+  document.body.classList.toggle('is-failed', !!failed);
+}
+
+var out = {
+  set: function (id, rows, kind) {
+    var box = document.getElementById('out-' + id);
+    if (!box) { return; }
+    box.className = 'out' + (kind ? ' ' + kind : '');
+    box.textContent = '';
+    if (!rows || !rows.length) {
+      var em = document.createElement('span');
+      em.className = 'out-empty';
+      em.textContent = 'Kein Ergebnis.';
+      box.appendChild(em);
+      return;
+    }
+    rows.forEach(function (row) {
+      var line = document.createElement('div');
+      line.className = 'out-row';
+      var l = document.createElement('span');
+      l.className = 'out-label';
+      l.textContent = row.label;
+      var v = document.createElement('span');
+      v.className = 'out-value';
+      v.textContent = row.value;
+      line.appendChild(l);
+      line.appendChild(v);
+      box.appendChild(line);
+    });
+  },
+  message: function (id, text, kind) {
+    var box = document.getElementById('out-' + id);
+    if (!box) { return; }
+    box.className = 'out' + (kind ? ' ' + kind : '');
+    box.textContent = text;
+  },
+  empty: function (id, text) {
+    var box = document.getElementById('out-' + id);
+    if (!box) { return; }
+    box.className = 'out';
+    box.textContent = '';
+    var em = document.createElement('span');
+    em.className = 'out-empty';
+    em.textContent = text;
+    box.appendChild(em);
+  }
+};
+
+function requireReady() {
+  if (!state.ready || !ggbApplet) {
+    throw new Error('Die GeoGebra-Engine ist noch nicht bereit.');
+  }
+}
+
+function cmd(statement) {
+  requireReady();
+  var result;
+  try {
+    result = ggbApplet.evalCommand(statement);
+  } catch (e) {
+    throw new Error((e && e.message) ? e.message : 'Befehl fehlgeschlagen: ' + statement);
+  }
+  if (result === false) { throw new Error('Ungültige Eingabe: ' + statement); }
+  return true;
+}
+
+function undoPoint() {
+  try { ggbApplet.setUndoPoint(); } catch (e) {}
+}
+
+function exists(name) {
+  try { return !!ggbApplet.exists(name); } catch (e) { return false; }
+}
+
+function deleteIfExists(name) {
+  try { if (ggbApplet.exists(name)) { ggbApplet.deleteObject(name); } } catch (e) {}
+}
+
+function valueOf(name) {
+  try {
+    var v = ggbApplet.getValue(name);
+    return (typeof v === 'number' && isFinite(v)) ? v : null;
+  } catch (e) { return null; }
+}
+
+function fmt(value) {
+  if (value === null || value === undefined || !isFinite(value)) { return '\u2013'; }
+  if (value !== 0 && Math.abs(value) < 1e-5) { return value.toExponential(3); }
+  var r = Math.round(value * 10000) / 10000;
+  var s = String(r);
+  if (s.indexOf('.') > -1) { s = s.replace(/0+$/, '').replace(/\.$/, ''); }
+  return s;
+}
+
+function cleanCas(text) {
+  if (text === null || text === undefined) { return null; }
+  var s = String(text).trim();
+  if (!s) { return null; }
+  s = s.replace(/^\$\s*/, '');
+  s = s.replace(/^\{/, '').replace(/\}$/, '');
+  s = s.replace(/:=/g, '=');
+  s = s.replace(/\s*\?\s*$/, '');
+  s = s.replace(/\s+/g, ' ');
+  s = s.replace(/\*([^0-9a-zA-Z(])/g, '·$1');
+  return s.trim() || null;
+}
+
+function casText(expression) {
+  requireReady();
+  if (typeof ggbApplet.evalCommandCAS === 'function') {
+    try {
+      var cleaned = cleanCas(ggbApplet.evalCommandCAS(expression));
+      if (cleaned) { return cleaned; }
+    } catch (e) {}
+  }
+  deleteIfExists('C0');
+  try {
+    ggbApplet.evalCommand('C0 = Text(' + expression + ')');
+    var txt = ggbApplet.getText('C0');
+    deleteIfExists('C0');
+    var fallback = cleanCas(txt);
+    if (fallback) { return fallback; }
+  } catch (e) {
+    deleteIfExists('C0');
+  }
+  return null;
+}
+
+function showInView(name) {
+  if (!name) { return; }
+  try { cmd('SetVisibleInView(' + name + ', 1, true)'); } catch (e) {}
+  try { ggbApplet.setVisible(name, true); } catch (e) {}
+  try { cmd('ShowLabel(' + name + ', true)'); } catch (e) {}
+}
+
+function pickName(base) {
+  var name = base;
+  var i = 1;
+  while (exists(name)) {
+    name = base + String(i);
+    i++;
+  }
+  return name;
+}
+
+function applyColor(name) {
+  var c = state.palette[state.colorIndex % state.palette.length];
+  state.colorIndex++;
+  try { cmd('SetColor(' + name + ', ' + c[0] + ', ' + c[1] + ', ' + c[2] + ')'); } catch (e) {}
+  return c;
+}
+
+function parseInput(raw) {
+  var s = String(raw || '').trim();
+  var m = s.match(/^([A-Za-z][A-Za-z0-9_]*)\s*(?:\(([^()]*)\))?\s*=\s*([\s\S]+)$/);
+  if (m) {
+    return { raw: s, name: m[1], args: m[2] ? m[2].trim() : '', expr: m[3].trim(), assignment: true };
+  }
+  return { raw: s, name: '', args: '', expr: s, assignment: false };
+}
+
+function equationLike(parsed) {
+  if (!parsed.assignment || parsed.args) { return false; }
+  return /[+\-*/^()]/.test(parsed.name) || /^[xyz]$/i.test(parsed.name);
+}
+
+function primaryVariable(expression) {
+  var vars = ['x', 't', 'u', 'y'];
+  for (var i = 0; i < vars.length; i++) {
+    if (new RegExp('(^|[^A-Za-z])' + vars[i] + '([^A-Za-z]|$)').test(expression)) { return vars[i]; }
+  }
+  return 'x';
+}
+
+function defineUserFunction(parsed) {
+  if (parsed.args) {
+    cmd(parsed.raw);
+    return { name: parsed.name, variable: parsed.args.split(',')[0].trim() || 'x', expr: parsed.expr };
+  }
+  if (parsed.assignment && !equationLike(parsed)) {
+    cmd(parsed.raw);
+    return { name: parsed.name, variable: 'x', expr: parsed.expr };
+  }
+  var v = primaryVariable(parsed.expr);
+  var name = pickName('T');
+  cmd(name + '(' + v + ') = ' + parsed.expr);
+  return { name: name, variable: v, expr: parsed.expr };
+}
+
+function syncSize() {
+  var stage = $('#stage');
+  if (!stage || !ggbApplet) { return; }
+  var w = Math.floor(stage.clientWidth);
+  var h = Math.floor(stage.clientHeight);
+  if (w < 40 || h < 40) { return; }
+  try {
+    if (typeof ggbApplet.setSize === 'function') { ggbApplet.setSize(w, h); }
+    else {
+      if (typeof ggbApplet.setWidth === 'function') { ggbApplet.setWidth(w); }
+      if (typeof ggbApplet.setHeight === 'function') { ggbApplet.setHeight(h); }
+    }
+  } catch (e) {}
+  try { if (typeof ggbApplet.recalculateEnvironments === 'function') { ggbApplet.recalculateEnvironments(); } } catch (e2) {}
+}
+
+function setPerspective(code) {
+  requireReady();
+  state.perspective = code;
+  $$('#viewTabs .tab').forEach(function (tab) {
+    tab.classList.toggle('active', tab.getAttribute('data-perspective') === code);
+  });
+  var numeric = { G: 2, T: 5, S: 3, B: 6 };
+  var applied = false;
+  if (typeof ggbApplet.setPerspective === 'function') {
+    try { ggbApplet.setPerspective(code); applied = true; } catch (e) {}
+    if (!applied) {
+      try { ggbApplet.setPerspective(numeric[code]); applied = true; } catch (e2) {}
+    }
+  }
+  if (!applied) { throw new Error('Perspektive konnte nicht gewechselt werden.'); }
+  syncSize();
+  setTimeout(syncSize, 280);
+  setTimeout(syncSize, 750);
+}
+
+function ensureGraphicsView() {
+  if (state.perspective !== 'G') { setPerspective('G'); }
+}
+var STAT_SLOT = { Mean: 'M1', Median: 'M2', StandardDeviation: 'M3', Variance: 'M4', Range: 'M5' };
+state.stats = {};
+
+function guessFunction() {
+  if (state.fn && exists(state.fn)) { return state.fn; }
+  try {
+    if (typeof ggbApplet.getAllObjectNames === 'function') {
+      var list = ggbApplet.getAllObjectNames('function') || [];
+      if (list.length) { return String(list[list.length - 1]); }
+    }
+  } catch (e) {}
+  return null;
+}
+
+var CAS = {
+  input: function () {
+    var v = String($('#casInput').value || '').trim();
+    if (!v) { throw new Error('Bitte eine Eingabe eintragen.'); }
+    return parseInput(v);
+  },
+
+  run: function () {
+    var p = CAS.input();
+    undoPoint();
+    if (!p.assignment && !/[A-Za-z]/.test(p.expr)) {
+      out.set('cas', [{ label: 'Ausdruck', value: p.expr }, { label: 'Wert', value: casText(p.expr) || '\u2013' }], 'out-ok');
+      return;
+    }
+    var target = defineUserFunction(p);
+    var rows = [{ label: 'Eingabe', value: p.raw }];
+    try { rows.push({ label: 'Definition', value: ggbApplet.getDefinitionString(target.name) }); } catch (e) {}
+    if (exists(target.name)) {
+      applyColor(target.name);
+      state.fn = target.name;
+      state.fnExpr = target.expr;
+      state.fnVar = target.variable;
+      rows.push({ label: 'Status', value: 'in der Grafik gezeichnet' });
+    }
+    out.set('cas', rows, 'out-ok');
+  },
+
+  solve: function () {
+    var p = CAS.input();
+    undoPoint();
+    var equation;
+    if (p.args) {
+      var t = defineUserFunction(p);
+      applyColor(t.name);
+      state.fn = t.name;
+      state.fnExpr = t.expr;
+      state.fnVar = t.variable;
+      equation = p.expr + ' = 0';
+    } else if (p.assignment && !equationLike(p)) {
+      equation = p.raw;
+    } else {
+      equation = /=/.test(p.expr) ? p.expr : (p.expr + ' = 0');
+    }
+    var result = casText('Solve(' + equation + ')');
+    out.set('cas', [
+      { label: 'Gleichung', value: equation },
+      { label: 'CAS-Befehl', value: 'Solve' },
+      { label: 'Lösungen', value: result || 'keine symbolische Lösung' }
+    ], 'out-ok');
+  },
+
+  derivative: function () {
+    var p = CAS.input();
+    undoPoint();
+    var t = defineUserFunction(p);
+    var target = 'C1';
+    deleteIfExists(target);
+    cmd(target + ' = Derivative(' + t.name + ')');
+    showInView(target);
+    applyColor(target);
+    var symbol = casText('Derivative(' + t.expr + (t.variable === 'x' ? '' : ', ' + t.variable) + ')');
+    out.set('cas', [
+      { label: 'Funktion', value: t.name + '(' + t.variable + ') = ' + t.expr },
+      { label: 'Ableitung', value: symbol || '\u2013' },
+      { label: 'Gezeichnet', value: target }
+    ], 'out-ok');
+  },
+
+  integral: function () {
+    var p = CAS.input();
+    undoPoint();
+    var t = defineUserFunction(p);
+    var target = 'C2';
+    deleteIfExists(target);
+    cmd(target + ' = Integral(' + t.name + ')');
+    showInView(target);
+    applyColor(target);
+    var symbol = casText('Integral(' + t.expr + (t.variable === 'x' ? '' : ', ' + t.variable) + ')');
+    out.set('cas', [
+      { label: 'Funktion', value: t.name + '(' + t.variable + ') = ' + t.expr },
+      { label: 'Integral', value: symbol || '\u2013' },
+      { label: 'Gezeichnet', value: target }
+    ], 'out-ok');
+  },
+
+  simplify: function () {
+    var p = CAS.input();
+    undoPoint();
+    var expr = p.expr;
+    var symbol = casText('Simplify(' + expr + ')');
+    var rows = [
+      { label: 'Eingabe', value: expr },
+      { label: 'Vereinfacht', value: symbol || '\u2013' },
+      { label: 'CAS-Befehl', value: 'Simplify' }
+    ];
+    if (symbol) {
+      var target = null;
+      try {
+        if (p.args) {
+          cmd(p.name + '(' + p.args + ') = ' + symbol);
+          target = p.name;
+        } else if (!p.assignment) {
+          target = pickName('T');
+          cmd(target + '(x) = ' + symbol);
+        }
+        if (target) {
+          showInView(target);
+          applyColor(target);
+          rows.push({ label: 'Gezeichnet', value: target });
+        }
+      } catch (e) {}
+    }
+    out.set('cas', rows, 'out-ok');
+  },
+
+  factor: function () {
+    var p = CAS.input();
+    undoPoint();
+    var symbol = casText('Factor(' + p.expr + ')');
+    out.set('cas', [
+      { label: 'Eingabe', value: p.expr },
+      { label: 'Faktorisierung', value: symbol || '\u2013' },
+      { label: 'CAS-Befehl', value: 'Factor' }
+    ], 'out-ok');
+  },
+
+  roots: function () {
+    var p = CAS.input();
+    undoPoint();
+    var t = defineUserFunction(p);
+    applyColor(t.name);
+    state.fn = t.name;
+    state.fnExpr = t.expr;
+    state.fnVar = t.variable;
+    var target = 'C3';
+    deleteIfExists(target);
+    cmd(target + ' = Roots(' + t.name + ')');
+    showInView(target);
+    var count = null;
+    try {
+      cmd('C4 = Length(' + target + ')');
+      count = valueOf('C4');
+      deleteIfExists('C4');
+    } catch (e) { deleteIfExists('C4'); }
+    var symbol = casText('Solve(' + t.expr + ' = 0)');
+    out.set('cas', [
+      { label: 'Funktion', value: t.name + '(' + t.variable + ') = ' + t.expr },
+      { label: 'Nullstellen', value: symbol || '\u2013' },
+      { label: 'Anzahl', value: count === null ? '\u2013' : fmt(count) },
+      { label: 'Markiert in', value: target }
+    ], 'out-ok');
+  }
+};
+
+function buildToolGrid() {
+  var grid = $('#toolGrid');
+  if (!grid) { return; }
+  TOOLS.forEach(function (tool) {
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-tool';
+    button.setAttribute('data-mode', String(tool.mode));
+    button.innerHTML = svgIcon(tool.icon, 21) + '<span></span>';
+    button.lastChild.textContent = tool.label;
+    button.addEventListener('click', function () { activateTool(tool.mode, tool.label, button); });
+    grid.appendChild(button);
+  });
+}
+
+function activateTool(mode, label, button) {
+  requireReady();
+  undoPoint();
+  ensureGraphicsView();
+  ggbApplet.setMode(mode);
+  $$('#toolGrid .btn-tool').forEach(function (b) { b.classList.remove('active'); });
+  if (button) { button.classList.add('active'); }
+  var hint = label === 'Verschieben'
+    ? 'Verschiebe-Modus aktiv \u2014 Objekte mit der Maus ziehen.'
+    : 'Werkzeug \u201e' + label + '\u201c aktiv \u2014 jetzt in der Grafik klicken/tippen.';
+  out.message('geo', hint, 'out-info');
+}
+
+function ensureSliders() {
+  if (state.slidersMade) { return; }
+  var defs = [['a', 1], ['b', -1], ['c', 0]];
+  defs.forEach(function (entry) {
+    if (!exists(entry[0])) {
+      cmd(entry[0] + ' = Slider(-6, 6, 0.1, ' + entry[1] + ')');
+    }
+    if (state.slidersVisible) {
+      showInView(entry[0]);
+    } else {
+      try { cmd('SetVisibleInView(' + entry[0] + ', 1, false)'); } catch (e) {}
+    }
+  });
+  state.slidersMade = true;
+}
+
+function setSlider(name, value) {
+  if (!state.ready) { return; }
+  try { ggbApplet.setValue(name, value); }
+  catch (e) { try { cmd('SetValue(' + name + ', ' + value + ')'); } catch (e2) {} }
+  var readout = $('#val' + name.toUpperCase());
+  if (readout) { readout.textContent = fmt(value); }
+}
+
+function plotFunction() {
+  var raw = String($('#fnInput').value || '').trim();
+  if (!raw) { throw new Error('Bitte eine Funktion eingeben.'); }
+  undoPoint();
+  ensureGraphicsView();
+  ensureSliders();
+  var p = parseInput(raw);
+  var name;
+  if (p.assignment && p.args) {
+    cmd(p.raw);
+    name = p.name;
+  } else if (p.assignment && !equationLike(p)) {
+    cmd(p.name + '(x) = ' + p.expr);
+    name = p.name;
+  } else {
+    name = pickName('f');
+    cmd(name + '(x) = ' + p.expr);
+  }
+  applyColor(name);
+  state.fn = name;
+  state.fnExpr = p.expr;
+  state.fnVar = 'x';
+  var def = '';
+  try { def = ggbApplet.getDefinitionString(name); } catch (e) {}
+  out.set('an', [
+    { label: 'Funktion', value: def || (name + '(x) = ' + p.expr) },
+    { label: 'Parameter', value: 'a = ' + fmt(valueOf('a')) + '   b = ' + fmt(valueOf('b')) + ' c = ' + fmt(valueOf('c')) }
+  ], 'out-ok');
+}
+
+function analysisAction(kind) {
+  var name = guessFunction();
+  if (!name) { throw new Error('Bitte zuerst eine Funktion plotten.'); }
+  undoPoint();
+  ensureGraphicsView();
+  var expr = state.fnExpr || '';
+  var rows = [{ label: 'Funktion', value: name + ' = ' + (expr || '\u2013') }];
+
+  if (kind === 'extrema') {
+    deleteIfExists('E1');
+    cmd('E1 = Extrema(' + name + ')');
+    showInView('E1');
+    applyColor('E1');
+    var critical = expr ? casText('Solve(Derivative(' + expr + ') = 0)') : null;
+    rows.push({ label: 'Kritische Punkte', value: critical || '\u2013' });
+    rows.push({ label: 'Markiert in', value: 'E1' });
+    out.set('an', rows, 'out-ok');
+    return;
+  }
+
+  if (kind === 'inflection') {
+    deleteIfExists('W1');
+    cmd('W1 = Inflection(' + name + ')');
+    showInView('W1');
+    applyColor('W1');
+    var inflection = expr ? casText('Solve(Derivative(Derivative(' + expr + ')) = 0)') : null;
+    rows.push({ label: 'Wendepunkte', value: inflection || '\u2013' });
+    rows.push({ label: 'Markiert in', value: 'W1' });
+    out.set('an', rows, 'out-ok');
+    return;
+  }
+
+  if (kind === 'roots') {
+    deleteIfExists('C3');
+    cmd('C3 = Roots(' + name + ')');
+    showInView('C3');
+    applyColor('C3');
+    var zeros = expr ? casText('Solve(' + expr + ' = 0)') : null;
+    rows.push({ label: 'Nullstellen', value: zeros || '\u2013' });
+    rows.push({ label: 'Markiert in', value: 'C3' });
+    out.set('an', rows, 'out-ok');
+    return;
+  }
+
+  ensureSliders();
+  deleteIfExists('A1');
+  cmd('A1 = Integral(' + name + ', 0, b)');
+  showInView('A1');
+  var area = valueOf('A1');
+  rows.push({ label: 'Fläche ∫ von 0 bis b', value: fmt(area) });
+  out.set('an', rows, 'out-ok');
+}
+
+function buildData() {
+  var raw = String($('#dataInput').value || '').trim();
+  if (!raw) { throw new Error('Bitte Werte eingeben, z. B. 1, 2, 5, 5, 8.'); }
+  var parts = raw.split(/[,;\s]+/).filter(function (s) { return s.length > 0; });
+  var values = parts.map(Number);
+  var invalid = values.some(function (v) { return !isFinite(v); });
+  if (!values.length || invalid) {
+    throw new Error('Nur Zahlen eingeben, getrennt durch Komma: 1, 2, 5, 5, 8');
+  }
+  undoPoint();
+  ensureGraphicsView();
+  deleteIfExists('D');
+  cmd('D = {' + values.join(', ') + '}');
+  state.stats = {};
+  renderStats();
+  return values;
+}
+
+function renderStats() {
+  var rows = [{ label: 'Daten', value: '{' + String($('#dataInput').value || '').trim() + '}' }];
+  Object.keys(state.stats).forEach(function (key) {
+    rows.push({ label: key, value: state.stats[key] });
+  });
+  out.set('st', rows, 'out-ok');
+}
+
+function statAction(command, caption) {
+  if (!exists('D')) { buildData(); }
+  undoPoint();
+  ensureGraphicsView();
+  var slot = STAT_SLOT[command];
+  deleteIfExists(slot);
+  cmd(slot + ' = ' + command + '(D)');
+  try { cmd('SetCaption(' + slot + ', "' + caption + '")'); } catch (e) {}
+  try { cmd('SetVisibleInView(' + slot + ', 1, true)'); } catch (e2) {}
+  try { cmd('ShowLabel(' + slot + ', true)'); } catch (e3) {}
+  state.stats[caption] = fmt(valueOf(slot));
+  renderStats();
+}
+
+function drawChart(kind) {
+  if (!exists('D')) { buildData(); }
+  undoPoint();
+  ensureGraphicsView();
+  if (state.chart) { deleteIfExists(state.chart); }
+  var label = 'G1';
+  deleteIfExists(label);
+  cmd(label + ' = ' + (kind === 'bar' ? 'BarChart(D)' : 'Histogram(D, 5)'));
+  state.chart = label;
+  showInView(label);
+  try { ggbApplet.showAllObjects(); } catch (e) {}
+  renderStats();
+  toast(kind === 'bar' ? 'Balkendiagramm gezeichnet.' : 'Histogramm mit 5 Klassen gezeichnet.', 'ok');
+}
+function viewReset() {
+  requireReady();
+  undoPoint();
+  ggbApplet.setCoordSystem(-10, 10, -10, 10);
+  try { ggbApplet.setAxesVisible(1, true, true); } catch (e) {}
+  state.grid = true;
+  try { ggbApplet.setGridVisible(true); } catch (e2) {}
+  out.message('view', 'Standardfenster \u221210 \u2026 10 gesetzt \u00b7 Raster an.', 'out-ok');
+}
+
+function viewAll() {
+  requireReady();
+  undoPoint();
+  ggbApplet.showAllObjects();
+  out.message('view', 'Alle Objekte sind jetzt im Bild.', 'out-ok');
+}
+
+function toggleGrid() {
+  requireReady();
+  state.grid = !state.grid;
+  ggbApplet.setGridVisible(state.grid);
+  out.message('view', 'Raster ' + (state.grid ? 'eingeschaltet' : 'ausgeschaltet') + '.', 'out-info');
+}
+
+function clearAll() {
+  requireReady();
+  try {
+    if (typeof ggbApplet.newConstruction === 'function') { ggbApplet.newConstruction(); }
+    else { ggbApplet.reset(); }
+  } catch (e) { ggbApplet.reset(); }
+  state.fn = null;
+  state.fnExpr = '';
+  state.slidersMade = false;
+  state.chart = '';
+  state.stats = {};
+  ['cas', 'an', 'st'].forEach(function (id) { out.empty(id, 'Konstruktion geleert.'); });
+}
+
+function guard(section, action) {
+  return function () {
+    if (!state.ready) {
+      toast('Die GeoGebra-Engine lädt noch.', 'err');
+      return;
+    }
+    try {
+      action();
+    } catch (error) {
+      var message = (error && error.message) ? error.message : String(error);
+      out.message(section, message, 'out-err');
+      toast(message, 'err');
+    }
+  };
+}
+
+function toggleSidebar(force) {
+  var isCollapsed = document.body.classList.contains('collapsed');
+  var next = (typeof force === 'boolean') ? force : !isCollapsed;
+  document.body.classList.toggle('collapsed', next);
+  setTimeout(syncSize, 260);
+}
+
+function wireEvents() {
+  $('#toggleSidebar').addEventListener('click', function () { toggleSidebar(); });
+  $('#collapseBtn').addEventListener('click', function () { toggleSidebar(true); });
+  $('#drawerBackdrop').addEventListener('click', function () { toggleSidebar(true); });
+  $('#retryBtn').addEventListener('click', function () { window.location.reload(); });
+
+  $$('#viewTabs .tab').forEach(function (tab) {
+    tab.addEventListener('click', guard('view', function () {
+      var code = tab.getAttribute('data-perspective');
+      undoPoint();
+      setPerspective(code);
+      var names = { G: 'Standard-2D-Grafik', T: '3D-Grafikraum', S: 'Tabellenkalkulation', B: 'Wahrscheinlichkeitsrechner' };
+      out.message('view', 'Ansicht: ' + names[code], 'out-ok');
+    }));
+  });
+
+  $('#casRun').addEventListener('click', guard('cas', function () { CAS.run(); }));
+  $$('[data-cas]').forEach(function (button) {
+    var action = button.getAttribute('data-cas');
+    button.addEventListener('click', guard('cas', function () {
+      if (typeof CAS[action] === 'function') { CAS[action](); }
+      else { throw new Error('Unbekannte Aktion: ' + action); }
+    }));
+  });
+
+  $('#moveTool').addEventListener('click', guard('geo', function () { activateTool(0, 'Verschieben', null); }));
+  $('#eraseTool').addEventListener('click', guard('geo', function () { activateTool(6, 'Löschen', null); }));
+
+  $('#fnPlot').addEventListener('click', guard('an', function () { plotFunction(); }));
+
+  ['A', 'B', 'C'].forEach(function (letter) {
+    var slider = $('#slider' + letter);
+    if (!slider) { return; }
+    slider.addEventListener('input', function () {
+      setSlider(letter.toLowerCase(), parseFloat(slider.value));
+    });
+  });
+
+  $('#showSliders').addEventListener('change', guard('an', function () {
+    state.slidersVisible = $('#showSliders').checked;
+    ensureSliders();
+    ['a', 'b', 'c'].forEach(function (name) {
+      try { cmd('SetVisibleInView(' + name + ', 1, ' + (state.slidersVisible ? 'true' : 'false') + ')'); } catch (e) {}
+    });
+    out.message('an', state.slidersVisible ? 'Slider werden angezeigt.' : 'Slider ausgeblendet.', 'out-info');
+  }));
+
+  $$('[data-an]').forEach(function (button) {
+    var action = button.getAttribute('data-an');
+    button.addEventListener('click', guard('an', function () { analysisAction(action); }));
+  });
+
+  $('#dataCreate').addEventListener('click', guard('st', function () { buildData(); toast('Datenliste erzeugt.', 'ok'); }));
+  $$('[data-stat]').forEach(function (button) {
+    var command = button.getAttribute('data-stat');
+    var caption = button.getAttribute('data-caption') || command;
+    button.addEventListener('click', guard('st', function () { statAction(command, caption); }));
+  });
+  $('#barChart').addEventListener('click', guard('st', function () { drawChart('bar'); }));
+  $('#histogram').addEventListener('click', guard('st', function () { drawChart('hist'); }));
+
+  $('#viewReset').addEventListener('click', guard('view', viewReset));
+  $('#viewAll').addEventListener('click', guard('view', viewAll));
+  $('#toggleGrid').addEventListener('click', guard('view', toggleGrid));
+  $('#clearAll').addEventListener('click', guard('view', clearAll));
+
+  var enterMap = { casInput: function () { CAS.run(); }, fnInput: function () { plotFunction(); }, dataInput: function () { buildData(); } };
+  Object.keys(enterMap).forEach(function (id) {
+    var field = $('#' + id);
+    if (!field) { return; }
+    field.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter') { return; }
+      event.preventDefault();
+      guard(id === 'casInput' ? 'cas' : (id === 'fnInput' ? 'an' : 'st'), enterMap[id]);
+    });
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') { return; }
+    var tag = (event.target && event.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') { return; }
+    if (state.ready) { activateTool(0, 'Verschieben', null); }
+  });
+
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    if (resizeTimer) { clearTimeout(resizeTimer); }
+    resizeTimer = setTimeout(syncSize, 180);
+  });
+
+  if (typeof window.ResizeObserver === 'function') {
+    try {
+      new window.ResizeObserver(function () {
+        if (resizeTimer) { clearTimeout(resizeTimer); }
+        resizeTimer = setTimeout(syncSize, 120);
+      }).observe($('#stage'));
+    } catch (e) {}
+  }
+}
+
+function isSuite(api) {
+  return String(readAppName(api)).toLowerCase() === 'suite';
+}
+
+function configureApplet() {
+  try { ggbApplet.setErrorDialogsActive(false); } catch (e) {}
+  try { ggbApplet.showMenuBar(false); } catch (e) {}
+  try { ggbApplet.showToolBar(false); } catch (e) {}
+  try { ggbApplet.showAlgebraInput(false); } catch (e) {}
+  try { ggbApplet.setOnTheFlyPointCreationActive(false); } catch (e) {}
+  try { ggbApplet.setAxesVisible(1, true, true); } catch (e) {}
+  try { ggbApplet.setGridVisible(true); } catch (e) {}
+  try { ggbApplet.setCoordSystem(-10, 10, -10, 10); } catch (e) {}
+}
+
+function buildSuiteApplet() {
+  if (typeof window.GGBApplet !== 'function') { return Promise.resolve(null); }
+  return new Promise(function (resolve) {
+    try {
+      var host = document.createElement('div');
+      host.className = 'ggb-host';
+      $('#stage').appendChild(host);
+      var resolveApi = null;
+      var loaded = new Promise(function (r) { resolveApi = r; });
+      var stage = $('#stage');
+      var params = {
+        appName: 'suite',
+        width: Math.max(360, Math.floor(stage.clientWidth)),
+        height: Math.max(360, Math.floor(stage.clientHeight)),
+        showMenuBar: false,
+        showToolBar: false,
+        showAlgebraInput: false,
+        showInputBar: false,
+        showFileMenu: false,
+        showPerspectiveMenu: false,
+        useBrowserForJS: false,
+        enableLabelDrags: true,
+        enableShiftDragZoom: true,
+        allowScrollBar: false,
+        showZoomButtons: true,
+        language: 'de',
+        appletOnLoad: function (api) { if (api) { resolveApi(api); } }
+      };
+      var old = document.getElementById('ggb-element');
+      if (old) { old.innerHTML = ''; }
+      var applet = new window.GGBApplet(params);
+      applet.inject(host);
+      var timeout = new Promise(function (r) { setTimeout(function () { r(null); }, 50000); });
+      Promise.race([loaded, timeout]).then(function (api) { resolve(api || null); });
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+function bootstrap() {
+  setStatus('load', 'Web-Bundle wird geladen');
+  setOverlay(
+    'GeoGebra Engine wird gestartet',
+    'Das offizielle Web-Bundle von geogebra.org wird geladen (appName: suite).',
+    false
+  );
+
+  waitFor(function () { return isApiReady(window.ggbApplet) ? window.ggbApplet : null; }, 45000)
+    .then(function (injected) {
+      if (injected && isSuite(injected)) { return injected; }
+      setStatus('load', 'Suite wird initialisiert');
+      setOverlay('Suite wird initialisiert', 'Die vollst\u00e4ndige GeoGebra Suite (appName: suite) wird geladen \u2013 inklusive CAS, 3D und Wahrscheinlichkeit.', false);
+      return buildSuiteApplet().then(function (built) { return built || injected; });
+    })
+    .then(function (api) {
+      if (!api) { throw new Error('Die GeoGebra-API wurde nicht verf\u00fcgbar.'); }
+      ggbApplet = api;
+      window.ggbApplet = api;
+      state.appName = readAppName(api);
+      try { state.version = String(api.getVersion() || '\u2014'); } catch (e) { state.version = '\u2014'; }
+      configureApplet();
+      try { setPerspective('G'); } catch (e) {}
+      state.ready = true;
+      document.body.classList.add('is-ready');
+      setStatus(isSuite(api) ? 'ok' : 'warn', 'Engine bereit');
+      syncSize();
+      setTimeout(syncSize, 400);
+      setTimeout(syncSize, 1200);
+      if (isSuite(api)) {
+        out.message('cas', 'Bereit. Beispiel: f(x)=x^2-4 \u2014 danach "Leite ab" w\u00e4hlen.', 'out-ok');
+      } else {
+        out.message('cas', 'Hinweis: Die Engine l\u00e4uft nicht im Modus "suite". CAS-, 3D- und Wahrscheinlichkeitsbefehle k\u00f6nnten eingeschr\u00e4nkt sein.', 'out-info');
+        toast('Engine l\u00e4uft im Modus "' + state.appName + '" statt "suite".');
+      }
+    })
+    .catch(function (error) {
+      var message = (error && error.message) ? error.message : String(error);
+      setStatus('err', 'Engine nicht verf\u00fcgbar');
+      document.body.classList.remove('is-ready');
+      setOverlay(
+        'Engine konnte nicht geladen werden',
+        message + ' Bitte Internetverbindung pr\u00fcfen und die Seite neu laden.',
+        true
+      );
+      toast('GeoGebra konnte nicht gestartet werden.', 'err');
+    });
+}
+
+function start() {
+  buildToolGrid();
+  wireEvents();
+  bootstrap();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', start);
+} else {
+  start();
+}
+</script>
+</body>
+</html>
